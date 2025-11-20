@@ -13,7 +13,7 @@ all: buildit main
 buildit:
 	$(MAKE) -C $(BUILDIT_PATH)
 
-main: main.cpp
+main: main.cpp buildit
 	$(CXX) $< $(CFLAGS) $(LDFLAGS) -o $@
 
 clean: 
