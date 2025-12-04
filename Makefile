@@ -1,10 +1,12 @@
 BUILDIT_PATH=./buildit
+MORPHO_HEADER_PATH=./include/morpho
+MORPHO_LIB_PATH=./lib
+
+CFLAGS=$(shell make --no-print-directory -C $(BUILDIT_PATH) compile-flags) -O3 -I$(MORPHO_HEADER_PATH) -Wl,-rpath,$(MORPHO_LIB_PATH)
+LDFLAGS=$(shell make --no-print-directory -C $(BUILDIT_PATH) linker-flags) -lmorpho -L$(MORPHO_LIB_PATH)  
 
 CXX=g++
 CC=clang
-
-CFLAGS=$(shell make --no-print-directory -C $(BUILDIT_PATH) compile-flags) -O3
-LDFLAGS=$(shell make --no-print-directory -C $(BUILDIT_PATH) linker-flags)
 
 .PHONY: buildit all
 
