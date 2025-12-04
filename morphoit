@@ -1,0 +1,30 @@
+#!/usr/bin/env sh
+
+# exit on any subcommand failing, unset variables are errors
+set -eu
+
+if ! [ $# -eq 1 ]; then 
+  >&2 echo "Usage: $(basename "$0") MORPHO_SRC_FILE_NAME"
+  exit 1
+fi
+
+MORPHO_FILE_PATH=$1
+if ! [ -f "$MORPHO_FILE_PATH" ]; then
+  >&2 echo "No such file '$MORPHO_FILE_PATH', exiting."
+  exit 1
+fi
+
+FILENAME=$(basename "$MORPHO_FILE_PATH")
+C_FILE_NAME="$FILENAME.c"
+BIN_FILE_NAME="$FILENAME.bin"
+
+# partial compilation to C file
+./main "$MORPHO_FILE_PATH" > "$C_FILE_NAME"
+
+# compile C file to binary
+CFLAGS="-O3"
+gcc $CFLAGS "$C_FILE_NAME" -o "$BIN_FILE_NAME"
+
+# run binary
+BIN_PATH=$(realpath "$BIN_FILE_NAME")
+"$BIN_PATH"
