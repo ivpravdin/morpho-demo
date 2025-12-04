@@ -3,6 +3,25 @@
 #include "builder/static_var.h"
 #include "builder/dyn_var.h"
 #include <iostream>
+#include <fstream>
+#include <iterator>
+
+extern "C"
+{
+  // Hackily include bits of morpho we need 
+  #include "morpho.h"
+  #define cmplx_h     // Suppress headers that don't play nice with C++
+  #define platform_h  //
+  #include "program.h"
+
+  #include "varray.h" // Define a missing type that's protected from casual use
+  typedef unsigned int instruction;
+  DECLARE_VARRAY(instruction, instruction);
+
+  // Prototypes for a couple of 
+  varray_instruction *program_getbytecode(program *p);
+  objectfunction *program_getglobalfn(program *p);
+}
 
 // Include the BuildIt types
 using builder::dyn_var;
@@ -35,46 +54,8 @@ static void print_wrapper_code(std::ostream &oss) {
 	oss << "void print(int x) {printf(\"%d\\n\", x);}\n";
 }
 
-const uint32_t example_bytecode[] = {
-    0x00000002,
-    0x0000001e,
-    0x00000002,
-    0x0001001e,
-    0x00010002,
-    0x00020102,
-    0x0100020a,
-    0x0015020f,
-    0x00000102,
-    0x0000011e,
-    0x00000102,
-    0x00020202,
-    0x0201030a,
-    0x0006030f,
-    0x0000021d,
-    0x01020303,
-    0x0000031e,
-    0x00010202,
-    0x02010103,
-    0xfff7ff0d,
-    0x0000011d,
-    0x0001021d,
-    0x0102030a,
-    0x0002030f,
-    0x0000011d,
-    0x0001011e,
-    0x00010102,
-    0x01000003,
-    0xffe8ff0d,
-    0x0001001d,
-    0x00000022,
-    0x00000024,
-};
-
-const int n = sizeof(example_bytecode) / sizeof(uint32_t);
-
-static dyn_var<int> morpho_vm(const uint32_t bytecode[], const int n) {
-    static_var<uint32_t> consts[] = {0, 1, 30000};
-
+static dyn_var<int> morpho_vm(const int n, const uint32_t bytecode[], const uint32_t consts[]) {
+    //static_var<uint32_t> consts[] = {0, 1, 30000};
     dyn_var<int32_t[255]> reg = {0};
     dyn_var<int32_t[255]> globals = {0};
     dyn_var<int32_t> left, right;
@@ -144,10 +125,63 @@ static dyn_var<int> morpho_vm(const uint32_t bytecode[], const int n) {
 }
 
 int main(int argc, char* argv[]) {
+    if (argc != 2) {
+        cerr << "Expected 1 argument with a path to a morpho src file, got " << argc - 1 << ". Exiting." << endl;
+        return EXIT_FAILURE;
+    }
+
+    char *src_file_path = argv[1];
+
+    ifstream src_file(src_file_path, ios::in);
+    if (not src_file.is_open()) {
+        cerr << "Could not open '" << src_file_path << "'. Exiting." << endl;
+        return EXIT_FAILURE;
+    }
+
+    std::string src(std::istreambuf_iterator<char>{src_file}, {});
+
 	builder::builder_context context;
-	auto ast = context.extract_function_ast(morpho_vm, "main", example_bytecode, n);
-    print_wrapper_code(std::cout);
-	block::c_code_generator::generate_code(ast, std::cout, 0);
+
+    morpho_initialize();
+
+    program *p = morpho_newprogram();
+    compiler *c = morpho_newcompiler(p);
+
+    error err;
+    error_init(&err);
+
+    // that char * cast is to remove constness :P
+    if (morpho_compile((char *)src.c_str(), c, false, &err)) {
+        varray_instruction *code = program_getbytecode(p);
+        objectfunction *globalfn = program_getglobalfn(p);
+        
+        uint32_t *bytecode = (uint32_t *) code->data;
+        int ninstructions = code->count;
+
+        int nconst = globalfn->konst.count; 
+        uint32_t consts[255]; // Must be static in length
+        for (int i=0; i<nconst; i++) {
+            if (MORPHO_ISINTEGER(globalfn->konst.data[i])) {
+                consts[i]=MORPHO_GETINTEGERVALUE(globalfn->konst.data[i]);
+            } else {
+                consts[i]=0;
+                printf("Warning: constant %i '", i);
+                morpho_printvalue(NULL, globalfn->konst.data[i]);
+                printf("' will be ignored.\n");
+            }
+        }
+
+        auto ast = context.extract_function_ast(morpho_vm, "main", ninstructions, bytecode, consts);
+        print_wrapper_code(std::cout);
+        block::c_code_generator::generate_code(ast, std::cout, 0);
+    } else {
+        printf("Compilation error [%s]: %s\n", err.id, err.msg);
+    }
+
+    morpho_freeprogram(p);
+    morpho_freecompiler(c);
+
+    morpho_finalize();
+
 	return 0;
 }
-

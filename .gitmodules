@@ -1,3 +1,7 @@
 [submodule "buildit"]
 	path = buildit
 	url = git@github.com:BuildIt-lang/buildit.git
+[submodule "morpho"]
+	path = morpho
+	branch = typecheck
+	url = https://github.com/Morpho-lang/morpho.git
