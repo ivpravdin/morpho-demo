@@ -4,4 +4,4 @@
 [submodule "morpho"]
 	path = morpho
 	branch = typecheck
-	url = https://github.com/Morpho-lang/morpho.git
+	url = git@github.com:Morpho-lang/morpho.git
