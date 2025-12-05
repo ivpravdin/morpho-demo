@@ -190,12 +190,13 @@ int main(int argc, char* argv[]) {
                      << std::hex
                      << bytecode[i] << "\n";
             }
-            return EXIT_SUCCESS;
+        }
+        else {
+            auto ast = context.extract_function_ast(morpho_vm, "main", ninstructions, bytecode, consts);
+            print_wrapper_code(std::cout);
+            block::c_code_generator::generate_code(ast, std::cout, 0);
         }
 
-        auto ast = context.extract_function_ast(morpho_vm, "main", ninstructions, bytecode, consts);
-        print_wrapper_code(std::cout);
-        block::c_code_generator::generate_code(ast, std::cout, 0);
     } else {
         printf("Compilation error [%s]: %s\n", err.id, err.msg);
     }
